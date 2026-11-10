@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fff4e6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Свинго — турник-песочница</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<style>
+  :root{
+    --ink:#3d3654; --muted:#8c85a1; --cream:#fff8f0;
+    --mint:#7fdcbc; --peach:#ffb199; --lav:#b9a7ff; --sky:#9fd0ff;
+  }
+  html,body{
+    height:100%; margin:0; overflow:hidden;
+    font-family:'Manrope','Inter',system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:#fff4e6;
+    overscroll-behavior:none; touch-action:none;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .off{display:none!important}
+  #game{touch-action:none}
+
+  /* ---------- Кнопки управления (полупрозрачные, крупные) ---------- */
+  .ctl{
+    background:rgba(255,255,255,.58);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border:2px solid rgba(255,255,255,.95);
+    box-shadow:0 8px 20px rgba(120,100,160,.2), inset 0 -4px 0 rgba(150,130,200,.14);
+    border-radius:30px; color:var(--ink); font-weight:800; font-size:17px; line-height:1.1;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    transition:transform .08s ease, background .12s ease; font-family:inherit; text-align:center;
+  }
+  .ctl svg{width:30px;height:30px}
+  .ctl.on,.ctl:active{transform:scale(.93); background:rgba(185,167,255,.8)}
+  .ctl-main{background:rgba(255,177,153,.78); font-size:20px}
+  .ctl-main svg{width:34px;height:34px}
+  .ctl-main.on,.ctl-main:active{background:rgba(255,140,110,.9)}
+  .ctl-grab{background:rgba(127,220,188,.7); flex-direction:row; font-size:17px}
+  .ctl-grab svg{width:26px;height:26px}
+  .ctl-grab.on,.ctl-grab:active{background:rgba(70,190,150,.9)}
+  .ctl.dim{visibility:hidden}
+
+  /* ---------- HUD ---------- */
+  .roundbtn{
+    width:56px;height:56px;border-radius:20px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.75); border:2px solid #fff; color:var(--ink);
+    box-shadow:0 6px 16px rgba(120,100,160,.18); transition:transform .08s;
+  }
+  .roundbtn:active{transform:scale(.92)}
+  .roundbtn svg{width:26px;height:26px}
+  .chip{
+    background:rgba(255,255,255,.78); border:2px solid #fff; border-radius:999px;
+    padding:6px 14px; font-weight:800; font-size:15px; box-shadow:0 4px 12px rgba(120,100,160,.12);
+    transition:background .2s, transform .2s;
+  }
+  .chip.hot{background:#ffe08a; transform:scale(1.06)}
+  #score{font-size:56px;font-weight:800;line-height:1;text-shadow:0 3px 0 #fff, 0 6px 14px rgba(120,100,160,.25)}
+  #score.bump{animation:bump .3s ease}
+  @keyframes bump{50%{transform:scale(1.25)}}
+  #hint{
+    background:rgba(255,255,255,.82); border:2px solid #fff; border-radius:20px;
+    padding:10px 16px; font-weight:700; font-size:16px; text-align:center;
+    box-shadow:0 6px 16px rgba(120,100,160,.15); transition:opacity .3s;
+  }
+
+  /* ---------- Экраны ---------- */
+  .overlay{position:absolute;inset:0;display:none;z-index:20}
+  .overlay.show{display:flex}
+  .scrim{background:rgba(255,248,240,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  .card{
+    background:#fff; border-radius:34px; padding:24px 20px;
+    box-shadow:0 20px 50px rgba(120,100,160,.28);
+    animation:pop .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pop{from{transform:scale(.8);opacity:0}}
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    min-height:64px;border-radius:26px;font-weight:800;font-size:21px;font-family:inherit;
+    padding:12px 18px; color:var(--ink); border:none;
+    box-shadow:0 8px 0 rgba(120,100,160,.18); transition:transform .08s, box-shadow .08s;
+  }
+  .btn:active{transform:translateY(6px);box-shadow:0 2px 0 rgba(120,100,160,.18)}
+  .btn small{font-size:15px;font-weight:700;opacity:.75}
+  .btn-primary{background:linear-gradient(180deg,#ffc4ad,#ffa88c)}
+  .btn-lav{background:linear-gradient(180deg,#cfc2ff,#b3a0ff)}
+  .btn-mint{background:linear-gradient(180deg,#a5ecd2,#77d9b6)}
+  .btn-soft{background:#fff;}
+  .logo{
+    font-size:58px;font-weight:800;letter-spacing:-1px;line-height:1;
+    color:#fff; text-shadow:0 4px 0 #ffa88c, 0 8px 0 rgba(255,140,110,.35), 0 14px 24px rgba(120,100,160,.3);
+  }
+  .tag{font-weight:700;font-size:18px;color:#6f6788;margin-top:12px}
+
+  .label{font-weight:800;font-size:16px;color:var(--muted)}
+  .big{font-size:72px;font-weight:800;line-height:1.05}
+  .stat{background:#f6f1ff;border-radius:22px;padding:12px;display:flex;flex-direction:column;gap:2px}
+  .stat b{font-size:28px;font-weight:800}
+  .stat span{font-size:15px;font-weight:700;color:var(--muted)}
+  .badge{
+    display:inline-block;background:#ffe08a;border-radius:999px;padding:8px 18px;font-weight:800;font-size:18px;
+    margin-bottom:10px; animation:wiggle .8s ease infinite;
+  }
+  @keyframes wiggle{50%{transform:rotate(-3deg) scale(1.06)}}
+
+  /* «Упал!» */
+  #fallText{
+    position:absolute;left:0;right:0;top:26%;text-align:center;z-index:15;pointer-events:none;
+    font-size:84px;font-weight:800;color:#ff7f7f;
+    text-shadow:0 5px 0 #fff, 0 10px 0 rgba(255,127,127,.3), 0 16px 28px rgba(120,100,160,.35);
+  }
+  #fallText.go{animation:drop .9s cubic-bezier(.3,1.5,.5,1) both}
+  @keyframes drop{
+    0%{transform:translateY(-260px) scale(.5) rotate(-14deg);opacity:0}
+    55%{transform:translateY(0) scale(1.15) rotate(5deg);opacity:1}
+    100%{transform:translateY(0) scale(1) rotate(-3deg);opacity:1}
+  }
+
+  /* Кастомизация */
+  #custom{background:linear-gradient(180deg,#fff8f0,#f4eeff);flex-direction:column}
+  .tab{
+    flex:1;min-height:52px;border-radius:20px;font-weight:800;font-size:17px;font-family:inherit;
+    background:#fff;color:var(--muted);border:none;box-shadow:0 4px 0 rgba(120,100,160,.12);
+  }
+  .tab.act{background:var(--lav);color:#fff}
+  .tile{
+    position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:14px 6px 12px;border-radius:24px;background:#fff;border:3px solid transparent;
+    font-weight:800;font-size:15px;color:var(--ink);font-family:inherit;
+    box-shadow:0 5px 0 rgba(120,100,160,.12);
+  }
+  .tile:active{transform:scale(.95)}
+  .tile.sel{border-color:var(--lav);background:#f6f1ff}
+  .tile.sel::after{content:'✓';position:absolute;top:4px;right:10px;color:#8a6df0;font-size:18px}
+  .sw{width:56px;height:56px;border-radius:50%;box-shadow:inset 0 -5px 0 rgba(0,0,0,.1)}
+  .sec{font-weight:800;font-size:17px;color:var(--muted);margin:14px 4px 10px}
+  .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+
+  .tg{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:60px;
+      background:#f6f1ff;border-radius:22px;padding:8px 16px;font-weight:800;font-size:18px;border:none;font-family:inherit;color:var(--ink)}
+  .tg i{width:56px;height:32px;border-radius:99px;background:#d9d3e8;position:relative;transition:background .2s}
+  .tg i::after{content:'';position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+  .tg.on i{background:var(--mint)}
+  .tg.on i::after{transform:translateX(24px)}
+</style>
+</head>
+<body>
+<div id="app" class="fixed inset-0 overflow-hidden">
+
+  <!-- Основной холст игры -->
+  <canvas id="game" class="absolute inset-0 w-full h-full"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="off absolute inset-x-0 top-0 z-10 px-3 pointer-events-none flex-col" style="padding-top:calc(env(safe-area-inset-top) + 10px)">
+    <div class="flex items-start justify-between">
+      <button id="btnPause" class="roundbtn pointer-events-auto" aria-label="Пауза">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+      </button>
+      <div class="text-center">
+        <div id="score">0</div>
+      </div>
+      <button id="btnRestart" class="roundbtn pointer-events-auto" aria-label="Рестарт">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>
+      </button>
+    </div>
+    <div class="mt-3 flex justify-center gap-2 flex-wrap">
+      <span class="chip" id="chipGrabs">Перехваты: 0</span>
+      <span class="chip" id="chipCombo">Комбо ×1</span>
+      <span class="chip" id="chipBest">Рекорд: 0</span>
+    </div>
+  </div>
+
+  <!-- Подсказка -->
+  <div id="hint" class="off absolute z-10 left-4 right-4 pointer-events-none" style="bottom:calc(env(safe-area-inset-bottom) + 200px);opacity:0"></div>
+
+  <!-- Кнопки управления -->
+  <div id="controls" class="off absolute inset-x-0 bottom-0 z-10 px-3" style="padding-bottom:calc(env(safe-area-inset-bottom) + 14px)">
+    <div class="grid items-end gap-3" style="grid-template-columns:1fr 1.15fr 1fr">
+      <button id="btnArch" class="ctl" style="height:116px">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 24c4-14 18-14 22 0"/><circle cx="16" cy="9" r="2.5" fill="currentColor"/></svg>
+        <span id="lblArch">Прогиб</span>
+      </button>
+      <div class="flex flex-col gap-2">
+        <button id="btnRelease" class="ctl ctl-main" style="height:96px">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 24L24 8"/><path d="M12 8h12v12"/></svg>
+          <span id="lblRelease">Отпустить</span>
+        </button>
+        <button id="btnGrab" class="ctl ctl-grab" style="height:56px">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M4 12h24"/><path d="M9 12v10M16 12v12M23 12v10"/></svg>
+          <span id="lblGrab">Схватиться</span>
+        </button>
+      </div>
+      <button id="btnTuck" class="ctl" style="height:116px">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M16 5a11 11 0 1 0 11 11"/><path d="M16 11a5 5 0 1 0 5 5"/><path d="M22 3l5 2-2 5"/></svg>
+        <span id="lblTuck">Группировка</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- «Упал!» -->
+  <div id="fallText" class="off">Упал!</div>
+
+  <!-- ГЛАВНОЕ МЕНЮ -->
+  <div id="menu" class="overlay">
+    <div class="flex flex-col h-full w-full px-5" style="padding-top:calc(env(safe-area-inset-top) + 34px);padding-bottom:calc(env(safe-area-inset-bottom) + 20px)">
+      <div class="text-center">
+        <div class="logo">Свинго</div>
+        <p class="tag">Качайся, крути сальто, хватайся!</p>
+      </div>
+      <div class="flex-1"></div>
+      <div class="grid gap-3">
+        <button data-act="classic" class="btn btn-primary">Классика <small id="mBestC"></small></button>
+        <button data-act="acro" class="btn btn-lav">Акробатика <small id="mBestA"></small></button>
+        <div class="grid grid-cols-2 gap-3">
+          <button data-act="custom" class="btn btn-soft">Стиль</button>
+          <button data-act="settings" class="btn btn-soft">Настройки</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ПАУЗА / НАСТРОЙКИ -->
+  <div id="pause" class="overlay scrim items-center justify-center p-5">
+    <div class="card w-full max-w-sm">
+      <div id="pauseTitle" class="text-center text-4xl font-extrabold mb-4">Пауза</div>
+      <div id="toggles" class="grid gap-3 mb-4"></div>
+      <div id="pauseGame" class="grid gap-3">
+        <button data-act="resume" class="btn btn-mint">Продолжить</button>
+        <button data-act="restart" class="btn btn-primary">Заново</button>
+        <button data-act="menu" class="btn btn-soft" style="background:#f6f1ff">В меню</button>
+      </div>
+      <button id="pauseBack" data-act="menu" class="btn btn-mint off w-full">Готово</button>
+    </div>
+  </div>
+
+  <!-- РЕЗУЛЬТАТ -->
+  <div id="over" class="overlay scrim items-center justify-center p-5">
+    <div class="card w-full max-w-sm text-center">
+      <div id="ovBadge" class="badge off">Новый рекорд!</div>
+      <div class="label">Твой счёт</div>
+      <div id="ovScore" class="big">0</div>
+      <div class="grid grid-cols-2 gap-3 my-4">
+        <div class="stat"><b id="ovGrabs">0</b><span id="ovGrabsL">Перехваты</span></div>
+        <div class="stat"><b id="ovBest">0</b><span>Рекорд</span></div>
+      </div>
+      <div class="grid gap-3">
+        <button data-act="restart" class="btn btn-primary">Ещё раз</button>
+        <button data-act="menu" class="btn btn-soft" style="background:#f6f1ff">В меню</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- КАСТОМИЗАЦИЯ -->
+  <div id="custom" class="overlay">
+    <div class="px-4 pb-3 flex items-center justify-between" style="padding-top:calc(env(safe-area-inset-top) + 14px)">
+      <div class="text-3xl font-extrabold">Стиль</div>
+      <button data-act="menu" class="btn btn-mint" style="min-height:52px;padding:8px 22px;font-size:18px">Готово</button>
+    </div>
+    <div class="px-4">
+      <canvas id="pv" class="w-full block" style="height:190px;border-radius:28px;box-shadow:0 8px 24px rgba(120,100,160,.2)"></canvas>
+      <div class="flex gap-2 mt-3">
+        <button class="tab" data-tab="hero">Герой</button>
+        <button class="tab" data-tab="bar">Турник</button>
+        <button class="tab" data-tab="bg">Фон</button>
+      </div>
+    </div>
+    <div id="customBody" class="scroll flex-1 px-4 pt-1" style="padding-bottom:calc(env(safe-area-inset-bottom) + 24px)"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   0. УТИЛИТЫ
+   ===================================================================== */
+const TAU = Math.PI * 2;
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const wrapPi = a => { a %= TAU; if (a > Math.PI) a -= TAU; if (a < -Math.PI) a += TAU; return a; };
+const hs = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+// поворот точки p вокруг c на угол a (в той же системе, что и угол тела)
+const rot = (p, c, a) => {
+  const dx = p[0] - c[0], dy = p[1] - c[1], co = Math.cos(a), si = Math.sin(a);
+  return [c[0] + dx * co + dy * si, c[1] - dx * si + dy * co];
+};
+function rr(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* =====================================================================
+   1. КОНФИГ И КОСМЕТИКА (всё открыто сразу)
+   ===================================================================== */
+const G = 1100;          // гравитация, px/с²
+const GROUND_Y = 520;    // уровень земли в мировых координатах
+const PUMP = 8;          // сила раскачки (рад/с²)
+
+const HEROES = [
+  { id:'mint',  name:'Мята',    c:'#6fd3ae', c2:'#46ad8c' },
+  { id:'peach', name:'Персик',  c:'#ffab91', c2:'#ee8266' },
+  { id:'lav',   name:'Лаванда', c:'#b9a3ff', c2:'#9279e6' },
+  { id:'lemon', name:'Лимон',   c:'#ffd45e', c2:'#e9b52f' },
+  { id:'sky',   name:'Небо',    c:'#7fc2ff', c2:'#559fe6' },
+  { id:'rose',  name:'Роза',    c:'#ff9cc2', c2:'#e977a5' },
+  { id:'coal',  name:'Графит',  c:'#6e6a85', c2:'#4d4a63' },
+  { id:'snow',  name:'Снег',    c:'#f3f0ff', c2:'#c0b9e0' }
+];
+const STYLES = [
+  { id:'classic', name:'Классика' },
+  { id:'chubby',  name:'Пухляш' },
+  { id:'sport',   name:'Спорт' },
+  { id:'cap',     name:'Кепка' }
+];
+const BAR_SKINS = [
+  { id:'steel', name:'Сталь',    c:'#c4cfdd', c2:'#8fa0b8' },
+  { id:'wood',  name:'Дерево',   c:'#d9a066', c2:'#a8733e' },
+  { id:'gold',  name:'Золото',   c:'#f5cb5c', c2:'#d19a1f' },
+  { id:'pink',  name:'Розовый',  c:'#ff9cc2', c2:'#e977a5' },
+  { id:'mint',  name:'Мятный',   c:'#7fdcbc', c2:'#4bb592' },
+  { id:'candy', name:'Леденец',  c:'#ff8f9f', c2:'#ffffff', stripes:true }
+];
+const THEME_LIST = [
+  { id:'gym',    name:'Спортзал', a:'#fff1dc', g:'#e9c79b' },
+  { id:'sunset', name:'Закат',    a:'#e9b8f0', g:'#b88fd6' },
+  { id:'forest', name:'Лес',      a:'#d9f3ff', g:'#86cb86' },
+  { id:'city',   name:'Город',    a:'#c8e2ff', g:'#94a8c4' }
+];
+const byId = (arr, id) => arr.find(x => x.id === id) || arr[0];
+
+/* =====================================================================
+   2. СОХРАНЕНИЕ
+   ===================================================================== */
+const SAVE_KEY = 'swingo_v1';
+const save = Object.assign(
+  { hero:'mint', style:'classic', bar:'steel', bg:'gym', bestClassic:0, bestAcro:0, auto:true, sound:true, vib:true },
+  (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } })()
+);
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+const bestKey = () => S.mode === 'classic' ? 'bestClassic' : 'bestAcro';
+
+/* =====================================================================
+   3. ЗВУК / ВИБРАЦИЯ
+   ===================================================================== */
+let actx;
+function beep(f, d = .08, type = 'sine', v = .05) {
+  if (!save.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(v, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + d);
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + d);
+  } catch (e) {}
+}
+const vibe = ms => { if (save.vib && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} } };
+
+/* =====================================================================
+   4. СОСТОЯНИЕ ИГРЫ
+   ===================================================================== */
+const canvas = $('game'), ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1, SC = 1, VW = 440, VH = 760;
+const cam = { x: 0, shake: 0 };
+const bars = [], plats = [], parts = [], texts = [];
+const inp = { arch:false, tuck:false, grab:false };
+
+const S = {
+  screen:'menu', mode:'classic', demo:true, paused:false, t:0,
+  state:'hang',                 // hang | flight | stand | fallen
+  x:0, y:0, vx:0, vy:0,         // центр масс
+  phi:0, omega:0, H:0,          // угол тела, угловая скорость, момент импульса
+  theta:0, L:60, angOff:0,      // маятник: угол от вертикали, длина, смещение позы
+  tuck:0, tuckT:0, arch:0, archT:0, lag:0, lagV:0,
+  bar:null, plat:null, noGrab:null, noGrabT:0, bestIdx:0,
+  flipAcc:0, flips:0, charge:0, prevFootY:0, prevLow:0,
+  score:0, grabs:0, combo:0, mult:1, fallT:0, grounded:false, shown:false, newRec:false
+};
+
+/* =====================================================================
+   5. ФИЗИКА — РЭГДОЛЛ-СКЕЛЕТ
+   Тело описано точками в локальной системе (x — вперёд, y — от головы к ногам).
+   Три ключевые позы смешиваются: вис / прогиб / группировка.
+   Конечности имеют "запаздывание" (пружина) — это даёт эффект рэгдолла.
+   ===================================================================== */
+const PE = { head:[0,-40], neck:[0,-28], sh:[0,-24], hip:[0,4],  knee:[1,26],  foot:[0,48],  elb:[2,-42], hand:[0,-60] };
+const PA = { head:[-2,-40],neck:[-2,-28],sh:[-1,-24],hip:[7,4],  knee:[3,26],  foot:[-8,47], elb:[0,-42], hand:[0,-60] };
+const PT = { head:[9,-17], neck:[6,-12], sh:[5,-10], hip:[0,6],  knee:[17,-5], foot:[2,10],  elb:[14,1],  hand:[14,6]  };
+
+function localPose(arch, tuck, lag, pin) {
+  const o = {};
+  for (const k in PE) o[k] = mix(mix(PE[k], PA[k], arch), PT[k], tuck);
+  // ноги запаздывают относительно тела
+  o.knee = rot(o.knee, o.hip, lag); o.foot = rot(o.foot, o.hip, lag * 1.4);
+  const sp = -0.22 * (1 - tuck);                       // дальняя нога чуть в сторону
+  o.kneeB = rot(o.knee, o.hip, sp); o.footB = rot(o.foot, o.hip, sp * 1.4);
+  if (pin) {                                           // руки на перекладине
+    o.hand = pin; o.handB = [pin[0], pin[1]];
+    const mx = (o.sh[0] + pin[0]) / 2, my = (o.sh[1] + pin[1]) / 2;
+    const d = Math.hypot(pin[0] - o.sh[0], pin[1] - o.sh[1]);
+    const sl = Math.max(0, 36 - d);
+    o.elb = [mx - sl * .8 - 1, my]; o.elbB = [mx - sl * .8 + 2, my];
+  } else {                                             // свободные руки болтаются
+    const a = lag * .8;
+    o.elb = rot(o.elb, o.sh, a); o.hand = rot(o.hand, o.sh, a * 1.2);
+    const s2 = .3 * (1 - tuck);
+    o.elbB = rot(o.elb, o.sh, s2); o.handB = rot(o.hand, o.sh, s2 * 1.2);
+  }
+  return o;
+}
+
+function buildSkeleton(x, y, ang, arch, tuck, lag, pin) {
+  const co = Math.cos(ang), si = Math.sin(ang);
+  const w = p => [x + p[0] * co + p[1] * si, y - p[0] * si + p[1] * co];
+  const pinLocal = pin ? [(pin[0] - x) * co - (pin[1] - y) * si, (pin[0] - x) * si + (pin[1] - y) * co] : null;
+  const lp = localPose(arch, tuck, lag, pinLocal);
+  const pt = {};
+  for (const k in lp) pt[k] = w(lp[k]);
+  return { pt, lp, ang, co, si };
+}
+const skel = () => buildSkeleton(S.x, S.y, S.phi, S.arch, S.tuck, S.lag, S.state === 'hang' ? [S.bar.x, S.bar.y] : null);
+
+/* ---------- Генерация турников и платформ ---------- */
+function makeBar(prev) {
+  const i = prev ? prev.i + 1 : 0;
+  const gap = 160 + Math.min(i * 4, 70) + Math.random() * 40;
+  const y = prev ? clamp(prev.y + (Math.random() - .5) * 110, 95, 235) : 150;
+  return { i, x: prev ? prev.x + gap : 0, y };
+}
+function makePlat(prev) {
+  const i = prev ? prev.i + 1 : 0;
+  const w = Math.max(110, 170 - i * 5);
+  const gap = 40 + Math.random() * 60 + Math.min(i * 3, 40);
+  const y = prev ? clamp(prev.y + (Math.random() - .5) * 90, 340, 450) : 430;
+  return { i, w, x: prev ? prev.x + prev.w / 2 + gap + w / 2 : 0, y };
+}
+function genAhead() {
+  const lim = cam.x + VW * 1.6;
+  if (S.mode === 'classic') {
+    let l = bars[bars.length - 1];
+    while (l.x < lim) { l = makeBar(l); bars.push(l); }
+    while (bars.length > 10 && bars[0] !== S.bar && bars[0].x < cam.x - VW) bars.shift();
+  } else {
+    let l = plats[plats.length - 1];
+    while (l.x < lim) { l = makePlat(l); plats.push(l); }
+    while (plats.length > 10 && plats[0] !== S.plat && plats[0].x < cam.x - VW) plats.shift();
+  }
+}
+
+/* ---------- Новый забег ---------- */
+function resetRun(mode, demo) {
+  Object.assign(S, {
+    mode, demo, paused:false, t:0, score:0, grabs:0, combo:0, mult:1, bestIdx:0,
+    tuck:0, tuckT:0, arch:0, archT:0, lag:0, lagV:0, angOff:0, fallT:0, grounded:false,
+    shown:false, newRec:false, flipAcc:0, flips:0, charge:0, noGrab:null, noGrabT:0, omega:0, H:0, vx:0, vy:0
+  });
+  bars.length = 0; plats.length = 0; parts.length = 0; texts.length = 0;
+  if (mode === 'classic') {
+    const b = makeBar(null); bars.push(b);
+    S.bar = b; S.state = 'hang'; S.theta = 0.04; S.L = 60; S.angOff = 0;
+    S.x = b.x + S.L * Math.sin(S.theta); S.y = b.y + S.L * Math.cos(S.theta); S.phi = S.theta;
+  } else {
+    const p = makePlat(null); plats.push(p);
+    S.plat = p; S.state = 'stand'; S.phi = 0; S.x = p.x; S.y = p.y - 48;
+  }
+  cam.x = S.x + 40; cam.shake = 0;
+  genAhead(); updateHud();
+  $('fallText').classList.add('off'); $('fallText').classList.remove('go');
+}
+
+/* ---------- Действия ---------- */
+function doRelease() {
+  if (S.screen !== 'play' || S.paused) return;
+  if (S.state === 'hang' && S.mode === 'classic') {
+    S.vx = S.L * S.omega * Math.cos(S.theta);
+    S.vy = -S.L * S.omega * Math.sin(S.theta);
+    S.phi = S.theta + S.angOff;
+    const I = 1 - .65 * S.tuck;
+    S.H = S.omega * .6 * I;                 // момент импульса сохраняется в полёте
+    S.flipAcc = 0; S.flips = 0; S.state = 'flight';
+    S.noGrab = S.bar; S.noGrabT = .3;
+    beep(520, .1, 'triangle');
+  } else if (S.state === 'stand' && S.mode === 'acro') {
+    const c = Math.max(.3, S.charge);
+    S.vx = 100 + 150 * c; S.vy = -(480 + 260 * c);
+    const I = 1 - .65 * S.tuck;
+    S.H = 3.2 * I; S.flipAcc = 0; S.flips = 0; S.charge = 0;
+    S.prevFootY = -1e9; S.state = 'flight';
+    beep(400 + c * 200, .12, 'triangle');
+  }
+}
+
+const COLS = ['#ff9cc2','#ffd45e','#7fdcbc','#9fd0ff','#b9a7ff','#ffab91'];
+function burst(x, y, n, cols = COLS, spd = 240) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, s = spd * (.3 + Math.random() * .8), life = .5 + Math.random() * .6;
+    parts.push({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s - 60, life, max:life, r:3 + Math.random() * 4, col:cols[i % cols.length] });
+  }
+  parts.push({ ring:true, x, y, life:.45, max:.45, r:10 });
+}
+function popText(x, y, str, col = '#ff8a6b', size = 24) { texts.push({ x, y, str, col, size, life:1.3 }); }
+
+function award(isNew, flips, hand) {
+  if (isNew) {
+    S.grabs++; S.combo++;
+    S.mult = Math.min(6, 1 + Math.floor(S.combo / 3));
+    const base = 10 * S.mult;
+    const bonus = flips * (S.mode === 'classic' ? 50 : 100) * S.mult;
+    S.score += base + bonus;
+    popText(hand[0], hand[1] - 30, '+' + (base + bonus), '#ff8a6b', 28);
+    if (flips > 0) popText(hand[0], hand[1] - 62, 'Сальто ×' + flips + '!', '#8a6df0', 24);
+    if (S.mult > 1 && S.combo % 3 === 0) popText(hand[0], hand[1] - 94, 'Комбо ×' + S.mult, '#e9a600', 24);
+    burst(hand[0], hand[1], 22);
+    beep(660, .1, 'sine', .06); setTimeout(() => beep(880, .14, 'sine', .06), 80);
+    vibe(25);
+  } else {
+    S.combo = 0; S.mult = 1;
+    popText(hand[0], hand[1] - 30, 'Комбо сброшено', '#9a93b0', 20);
+    burst(hand[0], hand[1], 8, ['#c9c2e6']);
+  }
+  updateHud(true);
+}
+
+function doGrab(b) {
+  const dx = S.x - b.x, dy = S.y - b.y, d = Math.hypot(dx, dy) || 1;
+  S.theta = Math.atan2(dx, dy);
+  S.L = clamp(d, 45, 75);
+  S.omega = clamp((S.vx * Math.cos(S.theta) - S.vy * Math.sin(S.theta)) / S.L, -10, 10);
+  S.angOff = wrapPi(S.phi - S.theta);
+  S.lagV += (Math.random() - .5) * 8;
+  const flips = Math.floor(Math.abs(S.flipAcc) / TAU + .15);
+  S.state = 'hang'; S.bar = b;
+  const isNew = b.i > S.bestIdx;
+  if (isNew) S.bestIdx = b.i;
+  award(isNew, flips, [b.x, b.y]);
+}
+
+function tryGrab(hand) {
+  const R = inp.grab ? 52 : (save.auto ? 30 : 0);
+  if (!R) return false;
+  for (const b of bars) {
+    if (b === S.noGrab && S.noGrabT > 0) continue;
+    if (Math.hypot(hand[0] - b.x, hand[1] - b.y) < R) { doGrab(b); return true; }
+  }
+  return false;
+}
+
+function land(p) {
+  const a = wrapPi(S.phi);
+  if (Math.abs(a) < 1.0) {
+    const flips = Math.floor(Math.abs(S.flipAcc) / TAU + .15);
+    S.state = 'stand'; S.angOff = a; S.phi = a; S.omega = 0; S.vx = S.vy = 0; S.plat = p;
+    const isNew = p.i > S.bestIdx;
+    if (isNew) S.bestIdx = p.i;
+    award(isNew, flips, [S.x, p.y]);
+  } else {
+    S.vy *= .3; S.y -= 4;
+    fall();
+  }
+}
+
+function fall() {
+  S.state = 'fallen'; S.grounded = false; S.fallT = 0;
+  S.vx *= .7; S.archT = 0; S.tuckT = .3;
+  S.lagV += (Math.random() - .5) * 12;
+  S.prevLow = S.y;
+  if (S.demo) return;
+  const key = bestKey(), prev = save[key];
+  S.newRec = S.score > prev && S.score > 0;
+  if (S.newRec) { save[key] = S.score; persist(); }
+  const ft = $('fallText'); ft.classList.remove('off', 'go'); void ft.offsetWidth; ft.classList.add('go');
+  cam.shake = 12; vibe([60, 40, 90]); beep(140, .25, 'sawtooth', .07);
+  updateHud();
+}
+
+/* ---------- Шаг физики (фиксированный dt) ---------- */
+function step(dt) {
+  S.t += dt;
+  S.noGrabT = Math.max(0, S.noGrabT - dt);
+  const k = 1 - Math.exp(-dt * 12);
+  S.tuck += (S.tuckT - S.tuck) * k;
+  S.arch += (S.archT - S.arch) * k;
+
+  const wantArch = S.demo ? Math.abs(S.omega) < 4.2 : inp.arch;
+  const wantTuck = S.demo ? false : inp.tuck;
+  let lagTarget = 0;
+
+  if (S.state === 'hang') {
+    /* --- Маятник: θ'' = -(g/L)·sinθ + момент раскачки − затухание --- */
+    S.archT = wantArch ? 1 : 0;
+    S.tuckT = wantTuck ? .35 : 0;                          // в висе группировка = подъём ног
+    const Lt = 60 - 12 * (S.tuck / .35);
+    const Ln = S.L + (Lt - S.L) * (1 - Math.exp(-dt * 6));
+    S.omega *= (S.L * S.L) / (Ln * Ln);                    // сохранение момента импульса
+    S.L = Ln;
+    let a = -(G / S.L) * Math.sin(S.theta) - .35 * S.omega;
+    if (wantArch) a += (Math.abs(S.omega) < .15 ? 1 : Math.sign(S.omega)) * PUMP;
+    S.omega = clamp(S.omega + a * dt, -10, 10);
+    S.theta += S.omega * dt;
+    S.angOff *= Math.exp(-dt * 10);
+    S.x = S.bar.x + S.L * Math.sin(S.theta);
+    S.y = S.bar.y + S.L * Math.cos(S.theta);
+    S.phi = S.theta + S.angOff;
+    lagTarget = -S.omega * .03;
+
+  } else if (S.state === 'flight') {
+    /* --- Полёт: баллистика + вращение. Группировка меняет момент инерции --- */
+    S.archT = 0;
+    S.tuckT = (S.mode === 'classic' && inp.grab) ? 0 : (wantTuck ? 1 : 0);
+    const I = 1 - .65 * S.tuck;
+    S.omega = clamp(S.H / I, -14, 14);
+    S.vy += G * dt; S.x += S.vx * dt; S.y += S.vy * dt;
+    S.phi += S.omega * dt; S.flipAcc += S.omega * dt;
+    lagTarget = -S.omega * .03;
+    const fl = Math.floor(Math.abs(S.flipAcc) / TAU + .15);
+    if (fl > S.flips) {
+      S.flips = fl; popText(S.x, S.y - 70, '↻ ×' + fl, '#8a6df0', 22); beep(780, .08, 'triangle', .05);
+    }
+    const sk = skel();
+    if (S.mode === 'classic') {
+      if (tryGrab(sk.pt.hand)) return;
+    } else {
+      const f = sk.pt.foot;
+      if (S.vy > 0) {
+        for (const p of plats) {
+          if (S.prevFootY <= p.y + 10 && f[1] >= p.y && Math.abs(f[0] - p.x) < p.w / 2 + 6) { land(p); break; }
+        }
+      }
+      S.prevFootY = f[1];
+    }
+    if (S.state === 'flight') {
+      const low = lowest(sk);
+      if (low >= GROUND_Y) fall();
+    }
+
+  } else if (S.state === 'stand') {
+    /* --- Акробатика: стоим на платформе, заряжаем прыжок --- */
+    S.vx = S.vy = 0; S.omega = 0; S.archT = 0;
+    S.charge = inp.arch ? Math.min(1, S.charge + dt / .9) : Math.max(0, S.charge - dt * 2.5);
+    S.tuckT = .55 * S.charge;
+    S.angOff *= Math.exp(-dt * 10); S.phi = S.angOff;
+    S.x += (S.plat.x - S.x) * (1 - Math.exp(-dt * 4));
+    const sk = skel();
+    S.y = S.plat.y - sk.lp.foot[1];
+
+  } else if (S.state === 'fallen') {
+    /* --- Падение: тряпичная кукла, отскоки, затухание --- */
+    S.fallT += dt;
+    S.vy += G * dt; S.x += S.vx * dt; S.y += S.vy * dt; S.phi += S.omega * dt;
+    const sk = skel();
+    const low = lowest(sk);
+    let floor = GROUND_Y;
+    for (const p of plats) if (Math.abs(S.x - p.x) < p.w / 2 + 4 && S.prevLow <= p.y + 8 && p.y < floor) floor = p.y;
+    if (low >= floor) {
+      S.y -= low - floor;
+      if (S.vy > 180) {
+        S.vy *= -.32; S.omega *= .6; S.lagV += (Math.random() - .5) * 14;
+        burst(S.x, floor, 8, ['#ffffff', '#e8dff7'], 120); beep(110, .1, 'sine', .06);
+      } else S.vy = 0;
+      S.grounded = true;
+      S.vx *= Math.exp(-dt * 4); S.omega *= Math.exp(-dt * 2.5);
+    }
+    S.prevLow = Math.min(low, floor);
+    if (S.grounded && Math.abs(S.vy) < 5) {
+      const tg = Math.round((S.phi - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2;
+      S.phi += (tg - S.phi) * (1 - Math.exp(-dt * 5));
+    }
+    if (S.fallT > 1.25 && !S.demo && !S.shown) { S.shown = true; showOver(); }
+  }
+
+  // пружина запаздывания конечностей
+  S.lagV += (-70 * (S.lag - lagTarget) - 7 * S.lagV) * dt;
+  S.lag = clamp(S.lag + S.lagV * dt, -1, 1);
+  genAhead();
+}
+
+function lowest(sk) {
+  const p = sk.pt;
+  let m = p.head[1] + 11;
+  for (const k of ['hip', 'knee', 'foot', 'hand', 'kneeB', 'footB', 'elb']) m = Math.max(m, p[k][1] + 4);
+  return m;
+}
+
+/* =====================================================================
+   6. РЕНДЕР — ФОНЫ
+   ===================================================================== */
+const eachTile = (cl, f, sp, vw, fn) => {
+  const off = cl * f, i0 = Math.floor(off / sp) - 1, i1 = Math.ceil((off + vw) / sp) + 1;
+  for (let i = i0; i <= i1; i++) fn(i, i * sp - off);
+};
+function cloud(c, x, y, s, col) {
+  c.fillStyle = col; c.beginPath();
+  c.arc(x, y, 18 * s, 0, TAU); c.arc(x + 20 * s, y - 8 * s, 22 * s, 0, TAU); c.arc(x + 42 * s, y, 17 * s, 0, TAU);
+  c.rect(x, y, 42 * s, 17 * s); c.fill();
+}
+function hills(c, vw, cl, gy, f, amp, wl, base, col) {
+  c.fillStyle = col; c.beginPath(); c.moveTo(0, gy);
+  for (let x = 0; x <= vw + 12; x += 12) {
+    const u = x + cl * f;
+    c.lineTo(x, gy - base - amp * Math.sin(u / wl) - amp * .5 * Math.sin(u / (wl * .43)));
+  }
+  c.lineTo(vw + 12, gy); c.closePath(); c.fill();
+}
+function tree(c, x, gy, h, col, trunk) {
+  c.fillStyle = trunk; c.fillRect(x - 3, gy - h * .18, 6, h * .18);
+  c.fillStyle = col;
+  for (let k = 0; k < 3; k++) {
+    const w = h * .42 * (1 - k * .22), yb = gy - h * .12 - k * h * .26;
+    c.beginPath(); c.moveTo(x - w, yb); c.lineTo(x + w, yb); c.lineTo(x, yb - h * .4); c.closePath(); c.fill();
+  }
+}
+function building(c, i, x, gy, w, h, col, warm) {
+  rr(c, x, gy - h, w, h + 4, 6); c.fillStyle = col; c.fill();
+  for (let wy = gy - h + 12; wy < gy - 16; wy += 20)
+    for (let wx = x + 9; wx < x + w - 12; wx += 17) {
+      c.fillStyle = hs(i * 31 + wx * .31 + wy) > .72 ? warm : 'rgba(255,255,255,.55)';
+      c.fillRect(wx, wy, 8, 11);
+    }
+}
+
+const THEMES = {
+  gym: {
+    sky:[[0,'#fff1dc'],[1,'#ffe3c6']], ground:'#e9c79b', top:'#f6dcb6',
+    layers(c, vw, vh, cl, gy) {
+      c.strokeStyle = 'rgba(150,120,170,.35)'; c.lineWidth = 2; c.beginPath();
+      for (let x = 0; x <= vw; x += 10) { const y = 40 + 30 * Math.sin(Math.PI * x / vw); x ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.stroke();
+      eachTile(cl, .3, 46, vw, (i, x) => {
+        const y = 40 + 30 * Math.sin(Math.PI * clamp(x, 0, vw) / vw);
+        c.fillStyle = COLS[((i % 6) + 6) % 6]; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 24, y); c.lineTo(x + 12, y + 28); c.closePath(); c.fill();
+      });
+      eachTile(cl, .2, 200, vw, (i, x) => {
+        rr(c, x + 20, gy - 370, 100, 150, 16); c.fillStyle = '#dff2ff'; c.fill(); c.lineWidth = 6; c.strokeStyle = '#fff'; c.stroke();
+        c.beginPath(); c.moveTo(x + 70, gy - 370); c.lineTo(x + 70, gy - 220); c.moveTo(x + 20, gy - 295); c.lineTo(x + 120, gy - 295); c.lineWidth = 4; c.stroke();
+      });
+      eachTile(cl, .5, 300, vw, (i, x) => {
+        if (hs(i) > .75) return;
+        c.fillStyle = '#e3bd8a'; rr(c, x + 100, gy - 250, 80, 250, 8); c.fill();
+        c.fillStyle = '#c99a62';
+        for (let y = gy - 238; y < gy - 8; y += 17) c.fillRect(x + 104, y, 72, 5);
+      });
+    },
+    deco(c, vw, vh, cl, gy) {
+      c.fillStyle = 'rgba(160,110,60,.13)';
+      eachTile(cl, 1, 80, vw, (i, x) => c.fillRect(x, gy + 8, 3, vh - gy));
+      eachTile(cl, 1, 420, vw, (i, x) => {
+        c.fillStyle = COLS[((i % 6) + 6) % 6]; c.beginPath(); c.arc(x + hs(i) * 200, gy - 12, 13, 0, TAU); c.fill();
+      });
+    }
+  },
+  sunset: {
+    sky:[[0,'#c9b6ff'],[.55,'#ffbfd5'],[1,'#ffe3b8']], ground:'#b88fd6', top:'#d2aef2',
+    layers(c, vw, vh, cl, gy) {
+      const sx = vw * .7, sy = gy - 290;
+      const g = c.createRadialGradient(sx, sy, 10, sx, sy, 150);
+      g.addColorStop(0, 'rgba(255,244,200,1)'); g.addColorStop(.4, 'rgba(255,230,190,.55)'); g.addColorStop(1, 'rgba(255,230,190,0)');
+      c.fillStyle = g; c.fillRect(0, 0, vw, vh);
+      c.fillStyle = '#fff4cf'; c.beginPath(); c.arc(sx, sy, 56, 0, TAU); c.fill();
+      eachTile(cl, .1, 260, vw, (i, x) => cloud(c, x + hs(i) * 90, gy - 380 + hs(i + 9) * 110, .8 + hs(i + 3) * .8, 'rgba(255,255,255,.7)'));
+      hills(c, vw, cl, gy, .3, 26, 90, 80, '#f4a9c0');
+      hills(c, vw, cl, gy, .55, 20, 70, 36, '#e48fb0');
+    },
+    deco() {}
+  },
+  forest: {
+    sky:[[0,'#d9f3ff'],[1,'#e8f8df']], ground:'#86cb86', top:'#a6e29b',
+    layers(c, vw, vh, cl, gy) {
+      c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(vw * .25, gy - 400, 40, 0, TAU); c.fill();
+      hills(c, vw, cl, gy, .15, 40, 140, 150, '#c9e8d8');
+      eachTile(cl, .35, 90, vw, (i, x) => tree(c, x, gy, 110 + hs(i) * 70, '#9bd5a5', '#b7a58a'));
+      eachTile(cl, .6, 140, vw, (i, x) => tree(c, x + hs(i + 4) * 40, gy, 170 + hs(i + 7) * 90, '#6fc28a', '#9a8870'));
+    },
+    deco(c, vw, vh, cl, gy) {
+      eachTile(cl, 1, 64, vw, (i, x) => {
+        c.fillStyle = COLS[((i % 6) + 6) % 6]; c.beginPath(); c.arc(x + hs(i) * 40, gy + 22 + hs(i + 2) * 40, 4, 0, TAU); c.fill();
+      });
+    }
+  },
+  city: {
+    sky:[[0,'#c8e2ff'],[1,'#f4f9ff']], ground:'#94a8c4', top:'#b3c4dc',
+    layers(c, vw, vh, cl, gy) {
+      eachTile(cl, .1, 280, vw, (i, x) => cloud(c, x + hs(i) * 100, gy - 400 + hs(i + 5) * 100, .8 + hs(i + 1) * .6, 'rgba(255,255,255,.85)'));
+      eachTile(cl, .2, 110, vw, (i, x) => building(c, i, x, gy, 60 + hs(i) * 40, 130 + hs(i + 3) * 190, '#bfd2ea', '#fff0c0'));
+      eachTile(cl, .45, 150, vw, (i, x) => building(c, i + 50, x, gy, 80 + hs(i + 8) * 50, 90 + hs(i + 11) * 140, '#a8bddb', '#ffeeb5'));
+    },
+    deco(c, vw, vh, cl, gy) {
+      c.fillStyle = '#f4f7fc';
+      eachTile(cl, 1, 70, vw, (i, x) => c.fillRect(x, gy + 36, 36, 5));
+    }
+  }
+};
+
+function drawBackground(c, vw, vh, cl, gy, themeId) {
+  const T = THEMES[themeId] || THEMES.gym;
+  const g = c.createLinearGradient(0, 0, 0, gy);
+  T.sky.forEach(([p, col]) => g.addColorStop(p, col));
+  c.fillStyle = g; c.fillRect(0, 0, vw, vh);
+  T.layers(c, vw, vh, cl, gy);
+  c.fillStyle = T.ground; c.fillRect(0, gy, vw, vh - gy + 2);
+  c.fillStyle = T.top; c.fillRect(0, gy, vw, 8);
+  T.deco(c, vw, vh, cl, gy);
+}
+
+/* =====================================================================
+   7. РЕНДЕР — ПРЕДМЕТЫ И ПЕРСОНАЖ
+   ===================================================================== */
+function drawBar(c, b, skinId, groundY, hot, t) {
+  const s = byId(BAR_SKINS, skinId);
+  // стойка
+  if (s.stripes) {
+    for (let y = b.y, k = 0; y < groundY; y += 14, k++) { c.fillStyle = k % 2 ? '#fff' : s.c; c.fillRect(b.x - 3.5, y, 7, Math.min(14, groundY - y)); }
+  } else { c.fillStyle = 'rgba(120,108,150,.38)'; c.fillRect(b.x - 3, b.y, 6, groundY - b.y); }
+  rr(c, b.x - 20, groundY - 6, 40, 10, 5); c.fillStyle = 'rgba(120,108,150,.45)'; c.fill();
+  if (hot) {
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 3; c.beginPath();
+    c.arc(b.x, b.y, 20 + Math.sin(t * 5) * 3, 0, TAU); c.stroke();
+  }
+  // перекладина (вид с торца)
+  c.beginPath(); c.arc(b.x, b.y, 7, 0, TAU); c.fillStyle = s.c; c.fill(); c.lineWidth = 2.5; c.strokeStyle = s.c2; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(b.x - 2, b.y - 2, 2, 0, TAU); c.fill();
+}
+
+function drawPlat(c, p, themeId) {
+  const T = THEMES[themeId] || THEMES.gym;
+  rr(c, p.x - p.w / 2, p.y, p.w, 24, 12); c.fillStyle = '#fffdf8'; c.fill();
+  c.lineWidth = 3; c.strokeStyle = T.ground; c.stroke();
+  rr(c, p.x - p.w / 2 + 6, p.y + 3, p.w - 12, 6, 3); c.fillStyle = T.top; c.fill();
+}
+
+function drawShadow(c, x, groundY, height) {
+  const a = .2 * clamp(1 - height / 420, .08, 1), rx = 28 * clamp(1 - height / 900, .5, 1);
+  c.fillStyle = 'rgba(80,60,110,' + a + ')'; c.beginPath(); c.ellipse(x, groundY + 4, rx, 6, 0, 0, TAU); c.fill();
+}
+
+/* Рисуем рэгдолл по готовому скелету */
+function drawCharacter(c, sk, hero, styleId, face) {
+  const P = sk.pt, chub = styleId === 'chubby';
+  const lw = chub ? 11 : 7, tw = chub ? 18 : 10;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  const line = (pts, w, col) => {
+    c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+    c.lineWidth = w; c.strokeStyle = col; c.stroke();
+  };
+  const part = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  line([P.sh, P.elbB, P.handB], lw, hero.c2);
+  line([P.hip, P.kneeB, P.footB], lw, hero.c2);
+  if (styleId === 'sport') line([P.hip, part(P.hip, P.kneeB, .45)], lw + 3, hero.c);
+  line([P.neck, P.hip], tw, hero.c);
+  line([P.hip, P.knee, P.foot], lw, hero.c);
+  if (styleId === 'sport') line([P.hip, part(P.hip, P.knee, .45)], lw + 3, hero.c2);
+  // кроссовки
+  for (const f of [P.footB, P.foot]) {
+    c.beginPath(); c.arc(f[0], f[1], lw * .62, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 2; c.strokeStyle = hero.c2; c.stroke();
+  }
+  line([P.sh, P.elb, P.hand], lw, hero.c);
+  for (const h of [P.handB, P.hand]) { c.beginPath(); c.arc(h[0], h[1], lw * .55, 0, TAU); c.fillStyle = '#ffe3cf'; c.fill(); }
+  // голова
+  const h = P.head;
+  c.save(); c.transform(sk.co, -sk.si, sk.si, sk.co, h[0], h[1]);
+  c.beginPath(); c.arc(0, 0, 11.5, 0, TAU); c.fillStyle = '#ffe3cf'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = hero.c2; c.stroke();
+  if (styleId === 'sport') {
+    c.save(); c.beginPath(); c.arc(0, 0, 11.5, 0, TAU); c.clip();
+    c.fillStyle = '#fff'; c.fillRect(-13, -8, 26, 5); c.fillStyle = hero.c2; c.fillRect(-13, -6.5, 26, 2); c.restore();
+  } else if (styleId === 'cap') {
+    c.fillStyle = hero.c2; c.beginPath(); c.arc(0, -1.5, 12, Math.PI, 0); c.closePath(); c.fill();
+    c.fillRect(2, -3.2, 15, 3.5);
+  } else {
+    c.fillStyle = hero.c2; c.beginPath(); c.arc(-2, -9, 4, 0, TAU); c.fill();     // чубчик
+  }
+  c.strokeStyle = '#4a3f66'; c.fillStyle = '#4a3f66'; c.lineWidth = 2;
+  if (face === 'x') {
+    for (const ex of [3.5, 8.5]) { c.beginPath(); c.moveTo(ex - 1.8, .2); c.lineTo(ex + 1.8, 3.8); c.moveTo(ex + 1.8, .2); c.lineTo(ex - 1.8, 3.8); c.stroke(); }
+  } else {
+    c.beginPath(); c.arc(4, 2, 1.8, 0, TAU); c.arc(8.6, 2, 1.8, 0, TAU); c.fill();
+    c.beginPath();
+    if (face === 'wow') c.arc(6.5, 7, 1.8, 0, TAU); else c.arc(6.5, 5.5, 2.6, .2, Math.PI - .2);
+    c.stroke();
+  }
+  c.restore();
+}
+
+/* =====================================================================
+   8. РЕНДЕР — ГЛАВНАЯ СЦЕНА
+   ===================================================================== */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  SC = Math.min(W / 440, H / 760);
+  VW = W / SC; VH = H / SC;
+}
+
+function render(dt) {
+  const c = ctx;
+  c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
+  const camLeft = cam.x - VW * .38;
+  const camTop = GROUND_Y - VH * .70;
+  drawBackground(c, VW, VH, camLeft, GROUND_Y - camTop, save.bg);
+
+  const sx = (Math.random() - .5) * cam.shake, sy = (Math.random() - .5) * cam.shake;
+  c.save(); c.translate(-camLeft + sx, -camTop + sy);
+
+  if (S.mode === 'classic') {
+    for (const b of bars) {
+      if (b.x < camLeft - 60 || b.x > camLeft + VW + 60) continue;
+      drawBar(c, b, save.bar, GROUND_Y, b.i === S.bestIdx + 1 && S.state !== 'fallen' && !S.demo, S.t);
+    }
+  } else {
+    for (const p of plats) if (p.x + p.w / 2 > camLeft - 20 && p.x - p.w / 2 < camLeft + VW + 20) drawPlat(c, p, save.bg);
+  }
+
+  drawShadow(c, S.x, GROUND_Y, GROUND_Y - S.y);
+  const sk = skel();
+  const face = S.state === 'fallen' ? 'x' : (S.state === 'flight' ? 'wow' : 'ok');
+  drawCharacter(c, sk, byId(HEROES, save.hero), save.style, face);
+
+  // частицы
+  for (const p of parts) {
+    const a = clamp(p.life / p.max, 0, 1);
+    c.globalAlpha = a;
+    if (p.ring) { c.strokeStyle = '#fff'; c.lineWidth = 4 * a; c.beginPath(); c.arc(p.x, p.y, p.r + (1 - a) * 50, 0, TAU); c.stroke(); }
+    else { c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.r * (.5 + a * .5), 0, TAU); c.fill(); }
+  }
+  c.globalAlpha = 1;
+  // всплывающие тексты
+  c.textAlign = 'center'; c.lineJoin = 'round';
+  for (const t of texts) {
+    c.globalAlpha = clamp(t.life, 0, 1);
+    c.font = '800 ' + t.size + 'px Manrope, sans-serif';
+    c.lineWidth = 6; c.strokeStyle = '#fff'; c.strokeText(t.str, t.x, t.y);
+    c.fillStyle = t.col; c.fillText(t.str, t.x, t.y);
+  }
+  c.globalAlpha = 1;
+  c.restore();
+}
+
+/* Предпросмотр в меню кастомизации */
+const pv = $('pv'), pctx = pv.getContext('2d');
+function drawPreview(t) {
+  const cw = pv.clientWidth, ch = pv.clientHeight;
+  if (!cw) return;
+  if (pv.width !== Math.round(cw * DPR) || pv.height !== Math.round(ch * DPR)) { pv.width = Math.round(cw * DPR); pv.height = Math.round(ch * DPR); }
+  const c = pctx; c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const vw = cw, vh = ch, barY = 36, gY = vh - 14;
+  drawBackground(c, vw, vh, t * 18, gY, save.bg);
+  c.save(); c.translate(vw / 2, 0);
+  const bar = { x: 0, y: barY, i: 0 };
+  drawBar(c, bar, save.bar, gY, false, t);
+  const th = .55 * Math.sin(t * 2.6), L = 60;
+  const x = L * Math.sin(th), y = barY + L * Math.cos(th);
+  const arch = .5 + .5 * Math.sin(t * 2.6 + 1.2);
+  const lag = -(.55 * 2.6 * Math.cos(t * 2.6)) * .03;
+  const sk = buildSkeleton(x, y, th, arch, 0, lag, [0, barY]);
+  drawCharacter(c, sk, byId(HEROES, save.hero), save.style, 'ok');
+  c.restore();
+}
+
+/* =====================================================================
+   9. UI
+   ===================================================================== */
+function updateHud(bump) {
+  $('score').textContent = S.score;
+  if (bump) { const s = $('score'); s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
+  $('chipGrabs').textContent = (S.mode === 'classic' ? 'Перехваты: ' : 'Приземления: ') + S.grabs;
+  const cb = $('chipCombo'); cb.textContent = 'Комбо ×' + S.mult; cb.classList.toggle('hot', S.mult > 1);
+  $('chipBest').textContent = 'Рекорд: ' + Math.max(save[bestKey()], S.score);
+}
+
+let hintTxt = '';
+function updateHint() {
+  let t = '';
+  if (S.screen === 'play' && S.grabs < 3) {
+    if (S.mode === 'classic') {
+      if (S.state === 'hang') t = S.grabs === 0 ? 'Удерживай «Прогиб», чтобы раскачаться, и жми «Отпустить»' : 'Раскачайся и отпусти на взлёте';
+      else if (S.state === 'flight') t = 'Группируйся, чтобы крутиться быстрее, и лови турник';
+    } else {
+      if (S.state === 'stand') t = 'Держи «Заряд», затем жми «Прыжок»';
+      else if (S.state === 'flight') t = 'Группировка — сальто! Приземляйся на ноги';
+    }
+  }
+  if (t !== hintTxt) {
+    hintTxt = t; const h = $('hint');
+    if (t) { h.textContent = t; h.classList.remove('off'); requestAnimationFrame(() => h.style.opacity = 1); }
+    else { h.style.opacity = 0; setTimeout(() => { if (!hintTxt) h.classList.add('off'); }, 300); }
+  }
+}
+
+function applyModeLabels() {
+  const cl = S.mode === 'classic';
+  $('lblArch').textContent = cl ? 'Прогиб' : 'Заряд';
+  $('lblRelease').textContent = cl ? 'Отпустить' : 'Прыжок';
+  $('btnGrab').classList.toggle('dim', !cl);
+}
+
+function refreshMenu() {
+  $('mBestC').textContent = 'рекорд ' + save.bestClassic;
+  $('mBestA').textContent = 'рекорд ' + save.bestAcro;
+}
+
+function showOver() {
+  $('ovScore').textContent = S.score;
+  $('ovGrabs').textContent = S.grabs;
+  $('ovGrabsL').textContent = S.mode === 'classic' ? 'Перехваты' : 'Приземления';
+  $('ovBest').textContent = save[bestKey()];
+  $('ovBadge').classList.toggle('off', !S.newRec);
+  go('over');
+  if (S.newRec && window.confetti) {
+    const colors = ['#ff9cc2', '#ffd45e', '#7fdcbc', '#9fd0ff', '#b9a7ff'];
+    confetti({ particleCount: 120, spread: 80, origin: { y: .55 }, colors, zIndex: 100 });
+    setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 70, origin: { x: 0, y: .7 }, colors, zIndex: 100 }), 250);
+    setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 70, origin: { x: 1, y: .7 }, colors, zIndex: 100 }), 250);
+    beep(784, .15, 'triangle'); setTimeout(() => beep(1046, .25, 'triangle'), 140);
+  }
+}
+
+function go(s) {
+  S.screen = s; clearInp();
+  $('menu').classList.toggle('show', s === 'menu');
+  $('custom').classList.toggle('show', s === 'custom');
+  $('pause').classList.toggle('show', s === 'pause' || s === 'settings');
+  $('over').classList.toggle('show', s === 'over');
+  const inGame = s === 'play' || s === 'pause' || s === 'over';
+  $('hud').classList.toggle('off', !inGame);
+  $('controls').classList.toggle('off', !(s === 'play' || s === 'pause'));
+  $('pauseGame').classList.toggle('off', s === 'settings');
+  $('pauseBack').classList.toggle('off', s !== 'settings');
+  $('pauseTitle').textContent = s === 'settings' ? 'Настройки' : 'Пауза';
+  S.paused = (s === 'pause' || s === 'custom');
+  if (s === 'pause' || s === 'settings') renderToggles();
+  if (s === 'menu') refreshMenu();
+  if (s === 'custom') renderCustom();
+  if (!inGame) { hintTxt = ''; $('hint').classList.add('off'); }
+}
+
+function startGame(mode) {
+  resetRun(mode, false); applyModeLabels(); go('play'); hintTxt = ''; updateHud();
+}
+function toMenu() { resetRun('classic', true); go('menu'); }
+
+/* ---------- Настройки (переключатели) ---------- */
+const TOGGLES = [
+  { k:'auto',  label:'Авто-хват' },
+  { k:'sound', label:'Звук' },
+  { k:'vib',   label:'Вибрация' }
+];
+function renderToggles() {
+  const box = $('toggles'); box.innerHTML = '';
+  TOGGLES.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'tg' + (save[t.k] ? ' on' : '');
+    b.innerHTML = '<span>' + t.label + '</span><i></i>';
+    b.onclick = () => { save[t.k] = !save[t.k]; persist(); renderToggles(); beep(600, .05); };
+    box.appendChild(b);
+  });
+}
+
+/* ---------- Кастомизация ---------- */
+let tab = 'hero';
+function headSvg(style, c2) {
+  const sw = style === 'chubby' ? 6 : 3;
+  let extra = '';
+  if (style === 'sport') extra = '<rect x="9" y="14" width="22" height="4" fill="#fff" stroke="' + c2 + '" stroke-width="1"/>';
+  if (style === 'cap') extra = '<path d="M9 19a11 11 0 0 1 22 0z" fill="' + c2 + '"/><rect x="20" y="17" width="14" height="3.5" rx="1.5" fill="' + c2 + '"/>';
+  return '<svg viewBox="0 0 40 40" width="56" height="56"><circle cx="20" cy="20" r="11" fill="#ffe3cf" stroke="' + c2 + '" stroke-width="' + sw + '"/>' + extra +
+         '<circle cx="18" cy="22" r="1.5" fill="#4a3f66"/><circle cx="24" cy="22" r="1.5" fill="#4a3f66"/></svg>';
+}
+function tileEl(label, swHtml, sel, onClick) {
+  const b = document.createElement('button');
+  b.className = 'tile' + (sel ? ' sel' : '');
+  b.innerHTML = swHtml + '<span>' + label + '</span>';
+  b.onclick = () => { onClick(); persist(); renderCustom(); beep(700, .05); };
+  return b;
+}
+function section(box, title, items) {
+  const h = document.createElement('div'); h.className = 'sec'; h.textContent = title; box.appendChild(h);
+  const g = document.createElement('div'); g.className = 'grid grid-cols-3 gap-3'; items.forEach(i => g.appendChild(i)); box.appendChild(g);
+}
+function renderCustom() {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('act', t.dataset.tab === tab));
+  const box = $('customBody'); box.innerHTML = '';
+  if (tab === 'hero') {
+    section(box, 'Цвет', HEROES.map(h => tileEl(h.name,
+      '<div class="sw" style="background:linear-gradient(135deg,' + h.c + ',' + h.c2 + ')"></div>', save.hero === h.id, () => save.hero = h.id)));
+    const hero = byId(HEROES, save.hero);
+    section(box, 'Образ', STYLES.map(s => tileEl(s.name, headSvg(s.id, hero.c2), save.style === s.id, () => save.style = s.id)));
+  } else if (tab === 'bar') {
+    section(box, 'Перекладина', BAR_SKINS.map(b => tileEl(b.name,
+      '<div class="sw" style="background:' + (b.stripes ? 'repeating-linear-gradient(45deg,#ff8f9f 0 8px,#fff 8px 16px)' : b.c) + ';border:4px solid ' + (b.stripes ? '#ff8f9f' : b.c2) + '"></div>',
+      save.bar === b.id, () => save.bar = b.id)));
+  } else {
+    section(box, 'Фон', THEME_LIST.map(t => tileEl(t.name,
+      '<div class="sw" style="border-radius:18px;background:linear-gradient(180deg,' + t.a + ' 0 68%,' + t.g + ' 68%)"></div>',
+      save.bg === t.id, () => save.bg = t.id)));
+  }
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => { tab = t.dataset.tab; renderCustom(); });
+
+/* ---------- Кнопки экранов ---------- */
+document.querySelectorAll('[data-act]').forEach(b => {
+  const fire = e => {
+    e.preventDefault();
+    const a = b.dataset.act;
+    if (a === 'classic') startGame('classic');
+    else if (a === 'acro') startGame('acro');
+    else if (a === 'custom') go('custom');
+    else if (a === 'settings') go('settings');
+    else if (a === 'resume') go('play');
+    else if (a === 'restart') startGame(S.mode);
+    else if (a === 'menu') toMenu();
+    beep(520, .05);
+  };
+  b.addEventListener('click', fire);
+});
+$('btnPause').addEventListener('click', () => { if (S.screen === 'play') go('pause'); });
+$('btnRestart').addEventListener('click', () => { if (S.screen === 'play') startGame(S.mode); });
+
+/* =====================================================================
+   10. ТАЧ-УПРАВЛЕНИЕ (touchstart / touchend + мышь для теста на ПК)
+   ===================================================================== */
+function clearInp() {
+  inp.arch = inp.tuck = inp.grab = false;
+  ['btnArch', 'btnTuck', 'btnGrab', 'btnRelease'].forEach(id => $(id).classList.remove('on'));
+}
+function bindHold(el, key) {
+  const down = e => { e.preventDefault(); inp[key] = true; el.classList.add('on'); };
+  const up = e => { e.preventDefault(); inp[key] = false; el.classList.remove('on'); };
+  el.addEventListener('touchstart', down, { passive: false });
+  el.addEventListener('touchend', up, { passive: false });
+  el.addEventListener('touchcancel', up, { passive: false });
+  el.addEventListener('mousedown', down);
+  window.addEventListener('mouseup', () => { if (inp[key]) { inp[key] = false; el.classList.remove('on'); } });
+}
+function bindTap(el, fn) {
+  const down = e => { e.preventDefault(); el.classList.add('on'); fn(); };
+  const up = e => { e.preventDefault(); el.classList.remove('on'); };
+  el.addEventListener('touchstart', down, { passive: false });
+  el.addEventListener('touchend', up, { passive: false });
+  el.addEventListener('touchcancel', up, { passive: false });
+  el.addEventListener('mousedown', down);
+  window.addEventListener('mouseup', () => el.classList.remove('on'));
+}
+bindHold($('btnArch'), 'arch');
+bindHold($('btnTuck'), 'tuck');
+bindHold($('btnGrab'), 'grab');
+bindTap($('btnRelease'), doRelease);
+
+// Запрещаем скролл/зум страницы, кроме прокручиваемых списков
+document.addEventListener('touchmove', e => { if (!e.target.closest('.scroll')) e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Клавиатура (для отладки на ПК)
+const KEYS = { ArrowLeft:'arch', KeyA:'arch', ArrowRight:'tuck', KeyD:'tuck', KeyG:'grab', ArrowUp:'grab' };
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); doRelease(); return; }
+  if (KEYS[e.code]) inp[KEYS[e.code]] = true;
+});
+window.addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = false; });
+
+// Автопауза при сворачивании
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.screen === 'play') go('pause'); });
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+
+/* =====================================================================
+   11. ГЛАВНЫЙ ЦИКЛ
+   ===================================================================== */
+let last = 0, acc = 0;
+const FIXED = 1 / 120;
+function frame(ts) {
+  const dt = Math.min(.05, (ts - last) / 1000 || .016); last = ts;
+  if (!S.paused) {
+    acc += dt;
+    while (acc >= FIXED) { step(FIXED); acc -= FIXED; }
+  }
+  // частицы, тексты, камера
+  if (!S.paused) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.life -= dt;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      if (!p.ring) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.vx *= .98; }
+    }
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const t = texts[i]; t.life -= dt; t.y -= 36 * dt;
+      if (t.life <= 0) texts.splice(i, 1);
+    }
+    const target = S.x + clamp(S.vx * .3, 0, 120) + 40;
+    cam.x += (target - cam.x) * (1 - Math.exp(-dt * 4));
+    cam.shake *= Math.exp(-dt * 8);
+  }
+  render(dt);
+  if (S.screen === 'custom') drawPreview(performance.now() / 1000);
+  updateHint();
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   12. СТАРТ
+   ===================================================================== */
+resize();
+resetRun('classic', true);   // на фоне меню качается демо-персонаж
+go('menu');
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
